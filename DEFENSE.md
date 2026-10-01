@@ -1,13 +1,12 @@
-# Защита проекта «Светофор УШГН»
+# Защита проекта «Светофор УШГН» (React-версия)
 
-Репозиторий: https://github.com/islamramilius89-pixel/svetofor-ushgn
+Репозиторий: https://github.com/islamramilius89-pixel/svetofor-ushgn (ветка `react-nextjs`)
 
 ## 1. Коротко о проекте (вступление, ~1 минута)
 
-«Светофор УШГН» — одностраничное приложение (SPA) о системе мониторинга скважин
-ПАО «Татнефть». УШГН — установки скважинных штанговых глубинных насосов.
-Система анализирует ток электродвигателя и по отклонениям от эталона находит
-неисправности оборудования.
+«Светофор УШГН» — сайт о системе мониторинга скважин ПАО «Татнефть». УШГН — установки
+скважинных штанговых глубинных насосов. Система анализирует ток электродвигателя и по
+отклонениям от эталона находит неисправности оборудования.
 
 Сайт состоит из четырёх разделов: «Главная», «О проекте», «Результаты», «Контакты».
 
@@ -16,415 +15,483 @@
 | Требование | Как выполнено |
 |---|---|
 | Базовая часть: лендинг | Главная страница: hero-блок, метрики, графики, возможности, призыв к действию |
-| Бонус: SPA с роутингом | Vue Router, 4 маршрута, переходы без перезагрузки страницы |
-| Бонус: стейт-менеджер | Pinia: общее хранилище, которое читают и меняют разные страницы |
+| Бонус: SPA с роутингом | Next.js App Router: 4 маршрута + 404, переходы через `<Link>` без перезагрузки страницы |
+| Бонус: стейт-менеджер | TanStack Query — состояние данных сервера (кеш, загрузка, ошибки, мутации) |
 
-**Стек:** Vue 3, Vue Router, Pinia, Tailwind CSS 4, сборщик Vite.
+**Стек:** Next.js 16 (App Router), React 19, TypeScript, TanStack Query, Zod, Tailwind CSS 4.
 
----
-
-## 2. Структура проекта
-
-```
-svetofor-ushgn/
-├── index.html              ← единственная HTML-страница, в неё монтируется Vue
-├── package.json            ← зависимости и команды (dev / build / preview)
-├── vite.config.js          ← настройка сборщика Vite
-├── postcss.config.js       ← подключение Tailwind через PostCSS
-├── public/favicon.svg      ← иконка вкладки
-└── src/
-    ├── main.js             ← точка входа: создаёт приложение, подключает Pinia и роутер
-    ├── App.vue             ← корневой компонент: меню + <router-view> + подвал
-    ├── style.css           ← подключение Tailwind и базовые стили
-    ├── router/index.js     ← таблица маршрутов
-    ├── stores/lightStore.js← хранилище Pinia (данные и действия)
-    └── pages/              ← страницы (по одной на маршрут)
-        ├── Home.vue
-        ├── About.vue
-        ├── Results.vue
-        └── Contact.vue
-```
-
-**Как всё связано (путь запуска):**
-
-```
-index.html → main.js → App.vue → <router-view> → нужная страница из pages/
-                 │                                        │
-                 ├── app.use(createPinia()) ──────────────┴─→ useLightStore()
-                 └── app.use(router)
-```
+Сначала проект был на Vue 3 (ветка `main`), затем я переписал его на React по слоистой
+архитектуре, описанной в скилле `.claude/skills/next-frontend-architecture/SKILL.md`.
 
 ---
 
-## 3. Разбор кода по файлам
+## 2. Архитектура: слои и путь вызова
 
-### 3.1. `index.html` — оболочка SPA
-
-```html
-<div id="app"></div>
-<script type="module" src="/src/main.js"></script>
+```
+app → component → flow → interaction → use-case → infrastructure → API
 ```
 
-- Это **единственная** HTML-страница приложения. Именно поэтому оно называется
-  *Single Page Application*: браузер загружает её один раз, а дальше весь
-  контент меняет JavaScript.
-- `<div id="app">` — пустой контейнер, в который Vue «монтирует» приложение.
-- `type="module"` — скрипт подключается как ES-модуль, поэтому в нём
-  работают `import` / `export`.
+Каждый слой отвечает за одно:
 
-### 3.2. `src/main.js` — точка входа
-
-```js
-const app = createApp(App)   // 1. создаём приложение из корневого компонента
-app.use(createPinia())       // 2. подключаем стейт-менеджер
-app.use(router)              // 3. подключаем роутер
-app.mount('#app')            // 4. выводим приложение в <div id="app">
-```
-
-- `createApp(App)` создаёт экземпляр Vue-приложения.
-- `app.use(...)` — подключение **плагинов**. После этого Pinia и роутер
-  доступны во всех компонентах. Отдельно импортировать их в каждый файл не нужно.
-- `mount` вызывается последним, когда все плагины уже подключены.
-- `import './style.css'` подключает глобальные стили (Tailwind).
-
-### 3.3. `src/router/index.js` — маршрутизация
-
-```js
-const routes = [
-  { path: '/',        component: Home,    name: 'home' },
-  { path: '/about',   component: About,   name: 'about' },
-  { path: '/results', component: Results, name: 'results' },
-  { path: '/contact', component: Contact, name: 'contact' },
-]
-
-const router = createRouter({
-  history: createWebHistory(),
-  routes,
-})
-```
-
-- `routes` — таблица соответствия «адрес → компонент страницы».
-- `name` — имя маршрута. По нему можно переходить без жёсткой ссылки:
-  `{ name: 'about' }`.
-- `createWebHistory()` — режим **History API**. Адреса выглядят обычно
-  (`/about`), без решётки. Роутер меняет URL через `history.pushState`,
-  поэтому страница не перезагружается, а кнопки «Назад» и «Вперёд» в браузере работают.
-- Альтернатива — `createWebHashHistory()` с адресами вида `/#/about`.
-
-### 3.4. `src/App.vue` — корневой компонент (каркас сайта)
-
-```vue
-<router-link to="/about">О проекте</router-link>
-...
-<main class="w-full flex-1">
-  <router-view />
-</main>
-```
-
-- **`<router-link>`** — ссылка роутера. Выглядит как обычная `<a>`, но
-  перехватывает клик: вместо перезагрузки страницы роутер просто меняет
-  компонент.
-- **`<router-view>`** — место, куда подставляется компонент текущего маршрута.
-  Меню и подвал остаются на месте, меняется только содержимое `<main>`.
-- Активный пункт меню подчёркивается. Роутер сам добавляет текущей ссылке
-  класс `router-link-exact-active`, стиль для него задан в `<style scoped>`.
-- `scoped` значит, что стили действуют только внутри этого компонента.
-- Вёрстка: `min-h-screen flex flex-col` на корне и `flex-1` на `<main>`.
-  Благодаря этому подвал всегда внизу окна, даже если на странице мало текста.
-
-### 3.5. `src/stores/lightStore.js` — хранилище Pinia
-
-```js
-export const useLightStore = defineStore('light', () => {
-  // State — данные
-  const wells = ref(2494)
-  const wellsWithDeviations = ref(1570)
-  const downtimeFound = ref(843)
-  const targetCompleteness = ref(90)
-  const currentCompleteness = ref(63.9)
-  const userMessages = ref([])
-  let nextMessageId = 1
-
-  // Getters — вычисляемые значения
-  const messageCount = computed(() => userMessages.value.length)
-
-  // Actions — функции, которые меняют данные
-  const addMessage = (message) => {
-    userMessages.value.push({
-      id: nextMessageId++,
-      text: message,
-      timestamp: new Date().toLocaleString('ru-RU'),
-    })
-  }
-  const removeMessage = (id) => {
-    userMessages.value = userMessages.value.filter(msg => msg.id !== id)
-  }
-  const clearMessages = () => { userMessages.value = [] }
-
-  return { wells, ..., addMessage, removeMessage, clearMessages }
-})
-```
-
-Хранилище написано в стиле **Setup Store** (через Composition API):
-
-| Часть Pinia | Чем сделано в коде | Пример |
+| Слой | Папка | Отвечает за |
 |---|---|---|
-| **state** (состояние) | `ref(...)` | `wells`, `userMessages` |
-| **getters** (вычисляемые) | `computed(...)` | `messageCount` |
-| **actions** (действия) | обычные функции | `addMessage`, `removeMessage`, `clearMessages` |
+| Маршруты | `src/app/` | URL, страницы, общий каркас, серверный API |
+| Экраны | `src/components/<feature>/` | вёрстка конкретной функции |
+| Сценарии | `src/flows/` | собирают данные, действия и состояние для одного экрана |
+| Взаимодействия | `src/interactions/` | TanStack Query: ключи кеша, запросы, мутации |
+| Действия приложения | `src/layers/use-cases/` | правила и последовательности действий без React |
+| Инфраструктура | `src/layers/infrastructure/` | HTTP-клиент, работа с API, источники данных |
+| Предметная область | `src/layers/domain/` | типы, расчёты, схемы проверки. Не знает ни про React, ни про HTTP |
+| Общее | `src/common/` | переиспользуемые UI-элементы, провайдер, форматирование |
 
-- `defineStore('light', ...)` — `'light'` — уникальный id хранилища
-  (по нему оно видно в Vue DevTools).
-- `useLightStore` — функция-«хук». Любой компонент вызывает её и получает
-  **один и тот же** экземпляр хранилища, поэтому данные общие для всех страниц.
-- Всё, что должно быть доступно снаружи, нужно **вернуть** из функции (`return`).
-- `messageCount` пересчитывается автоматически при изменении `userMessages`.
-- `nextMessageId++` даёт каждому сообщению уникальный id. Он нужен для
-  `:key` в списке и для удаления нужного сообщения.
+**Главное правило:** слой создаётся, только если у него есть своя ответственность.
+- Страница «О проекте» статичная, поэтому у неё только `app` и `components`.
+- Главная и «Результаты» получают данные через use-case, им не нужны flow и Query.
+- Полный путь через все слои есть только у формы контактов, потому что там есть запросы,
+  мутации, проверка данных и состояние формы.
 
-### 3.6. `src/pages/Home.vue` — главная (лендинг)
+**Зачем это нужно:** каждую часть можно менять отдельно. Например, если вместо статических
+данных появится настоящий API, поменяется только файл в `infrastructure`, а страницы,
+расчёты и компоненты останутся прежними.
 
-Блоки страницы: hero → 4 карточки метрик → прогресс полноты → типы
-неисправностей → охват по НГДУ → возможности → призыв к действию.
+---
 
-**Чтение данных из Pinia:**
+## 3. Структура проекта
 
-```vue
-<div class="text-5xl ...">{{ store.wells }}</div>
-...
-<script setup>
-import { computed } from 'vue'
-import { useLightStore } from '../stores/lightStore'
-
-const store = useLightStore()
-
-const deviationShare = computed(() =>
-  Math.round((store.wellsWithDeviations / store.wells) * 100)
-)
-</script>
+```
+src/
+├── app/
+│   ├── layout.tsx                 каркас: шапка, <main>, подвал, QueryProvider
+│   ├── page.tsx                   /          главная
+│   ├── about/page.tsx             /about
+│   ├── results/page.tsx           /results
+│   ├── contact/page.tsx           /contact
+│   ├── not-found.tsx              страница 404
+│   ├── icon.svg                   иконка вкладки (светофор)
+│   └── api/messages/
+│       ├── route.ts               GET (список), POST (создать), DELETE (очистить)
+│       └── [id]/route.ts          DELETE (удалить одно)
+├── components/
+│   ├── layout/                    SiteHeader, NavLink, SiteFooter
+│   ├── home/                      HomeScreen и его секции
+│   ├── about/AboutScreen.tsx
+│   ├── results/ResultsScreen.tsx
+│   └── contact/                   ContactScreen, ContactForm, MessageList, ContactInfo
+├── flows/use-contact-flow.ts
+├── interactions/messages.ts
+├── layers/
+│   ├── domain/monitoring/monitoring.ts       типы и расчёты показателей
+│   ├── domain/messages/message.ts            схема формы и сообщения (Zod)
+│   ├── use-cases/monitoring/get-monitoring-overview.ts
+│   ├── use-cases/messages/send-contact-message.ts     (браузер)
+│   ├── use-cases/messages/accept-contact-message.ts   (сервер)
+│   ├── infrastructure/http/http-client.ts
+│   ├── infrastructure/messages/messages-api.ts        (браузер → API)
+│   ├── infrastructure/messages/message-repository.ts  (хранилище на сервере)
+│   └── infrastructure/monitoring/monitoring-source.ts (данные из презентации)
+├── common/                        Card, PageShell, ProgressBar, QueryProvider, format.ts
+└── assets/styles/globals.css
 ```
 
-- `<script setup>` — сокращённая запись Composition API: всё, что объявлено
-  в скрипте, сразу доступно в шаблоне.
-- `{{ store.wells }}` — интерполяция. При изменении значения в хранилище
-  число на странице обновится само, это и есть **реактивность**.
-- `.value` в шаблоне не пишем: Pinia сама «разворачивает» `ref`.
-- `deviationShare` — вычисляемая доля скважин с отклонениями:
-  1570 / 2494 ≈ 63%. Число не вписано вручную, а считается из данных.
+---
 
-**Динамическая ширина прогресс-бара:**
+## 4. Роутинг: как устроено SPA в Next.js
 
-```vue
-<div :style="{ width: store.currentCompleteness + '%' }"></div>
-```
+### Маршруты — это папки
 
-`:style` (сокращение от `v-bind:style`) привязывает стиль к данным: ширина
-полосы равна значению из хранилища.
+В App Router адрес определяется **структурой папок**, отдельного файла с таблицей маршрутов нет:
 
-**Столбчатая диаграмма через `v-for`:**
-
-```vue
-<div v-for="(percent, ngdu) in ngduData" :key="ngdu">
-  <p>{{ ngdu }}</p>
-  <div class="w-20 h-40 bg-gray-300 flex items-end">
-    <div :style="{ height: percent + '%' }"></div>
-  </div>
-  <div>{{ percent }}%</div>
-</div>
-```
-
-- `v-for` по **объекту** даёт пару `(значение, ключ)`: `percent` = 67,
-  `ngdu` = «НГДУ №1».
-- `:key` — уникальный ключ элемента. По нему Vue понимает, какие элементы
-  изменились, и перерисовывает только их.
-- Высота столбика = процент, `items-end` прижимает его к низу.
-
-### 3.7. `src/pages/Contact.vue` — форма, которая пишет в Pinia
-
-Эта страница показывает **запись** в стейт-менеджер.
-
-```vue
-<form @submit.prevent="submitForm">
-  <input id="contact-name" v-model="form.name" type="text" required />
-  <input id="contact-email" v-model="form.email" type="email" required />
-  <textarea id="contact-message" v-model="form.message" required></textarea>
-  <button type="submit">Отправить</button>
-</form>
-```
-
-```js
-const store = useLightStore()
-const form = ref({ name: '', email: '', message: '' })
-
-const submitForm = () => {
-  const message = `${form.value.name} (${form.value.email}): ${form.value.message}`
-  store.addMessage(message)                       // запись в хранилище
-  form.value = { name: '', email: '', message: '' } // очистка формы
-}
-```
-
-- **`v-model`** — двусторонняя привязка. Ввод в поле сразу меняет
-  `form.name`, а изменение `form.name` в коде меняет поле.
-- **`@submit.prevent`** — обработчик отправки. Модификатор `.prevent`
-  вызывает `event.preventDefault()`: форма не перезагружает страницу, как это
-  было бы в обычном HTML.
-- `required` и `type="email"` — встроенная проверка браузера: пустую
-  форму или неправильный email отправить нельзя.
-- `<label for="...">` связан с `id` поля: клик по подписи ставит курсор
-  в поле (это нужно для доступности).
-- Список сообщений:
-
-```vue
-<section v-if="store.userMessages.length > 0">
-  <h2>Полученные сообщения ({{ store.messageCount }})</h2>
-  <div v-for="msg in store.userMessages" :key="msg.id">
-    {{ msg.text }} — {{ msg.timestamp }}
-    <button type="button" @click="store.removeMessage(msg.id)">✕</button>
-  </div>
-  <button type="button" @click="store.clearMessages">Очистить все</button>
-</section>
-```
-
-  - `v-if` — блок появляется в DOM, только когда есть сообщения.
-  - `@click` вызывает **actions** хранилища.
-  - `type="button"` — чтобы кнопки не считались кнопками отправки формы.
-
-### 3.8. `About.vue` и `Results.vue`
-
-Это страницы-статьи: описание системы, этапы развития, технические
-характеристики, результаты опытно-промышленной эксплуатации и дорожная карта.
-Логики в них нет, только вёрстка на Tailwind. Они нужны, чтобы у роутера
-было между чем переключаться.
-
-### 3.9. Стили: Tailwind CSS 4
-
-`style.css`:
-
-```css
-@import "tailwindcss";
-
-@layer base {
-  html { font-family: ...; }
-  body { color: #213547; background-color: #f9fafb; }
-}
-```
-
-- Tailwind — **утилитарный** CSS: стили пишутся классами прямо в разметке
-  (`p-8` — внутренний отступ, `rounded-2xl` — скругление, `shadow-xl` — тень).
-- Адаптивность через префиксы: `grid-cols-1 md:grid-cols-4` значит
-  «на телефоне 1 колонка, от 768px — 4».
-- Состояния: `hover:scale-105` увеличивает карточку при наведении.
-- Tailwind 4 подключается одной строкой `@import "tailwindcss"` и через плагин
-  `@tailwindcss/postcss` (в `postcss.config.js`). Какие классы используются,
-  он находит в файлах проекта сам, отдельный `tailwind.config.js` не нужен.
-- Свои базовые стили лежат внутри `@layer base`. Если писать их вне слоя,
-  они перебьют утилиты Tailwind. Именно эту ошибку я исправлял: сброс
-  `* { margin: 0; padding: 0 }` отключал все отступы на сайте.
-
-### 3.10. Сборка: Vite
-
-| Команда | Что делает |
+| Файл | Адрес |
 |---|---|
-| `npm install` | ставит зависимости из `package.json` |
-| `npm run dev` | dev-сервер на http://localhost:5173 с горячей перезагрузкой (HMR) |
-| `npm run build` | собирает готовый сайт в папку `dist/` (минифицированные JS и CSS) |
-| `npm run preview` | локально показывает собранную версию из `dist/` |
+| `app/page.tsx` | `/` |
+| `app/about/page.tsx` | `/about` |
+| `app/results/page.tsx` | `/results` |
+| `app/contact/page.tsx` | `/contact` |
+| `app/not-found.tsx` | любой несуществующий адрес |
 
-`vite.config.js` подключает плагин `@vitejs/plugin-vue`, который учит Vite
-понимать `.vue`-файлы.
+### Общий каркас — `layout.tsx`
+
+```tsx
+export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
+  return (
+    <html lang="ru">
+      <body className="min-h-screen flex flex-col ...">
+        <QueryProvider>
+          <SiteHeader />
+          <main className="w-full flex-1">{children}</main>
+          <SiteFooter />
+        </QueryProvider>
+      </body>
+    </html>
+  )
+}
+```
+
+- `children` — текущая страница. Шапка и подвал при переходах **не перерисовываются**,
+  меняется только содержимое `<main>`.
+- `metadata` с `template: '%s — Светофор УШГН'` задаёт заголовок вкладки, у каждой страницы он свой.
+
+### Переходы без перезагрузки — `<Link>`
+
+```tsx
+'use client'
+export function NavLink({ href, children }) {
+  const isActive = usePathname() === href
+  return (
+    <Link href={href} aria-current={isActive ? 'page' : undefined} className={...}>
+      {children}
+    </Link>
+  )
+}
+```
+
+- `<Link>` из `next/link` перехватывает клик: браузер не загружает страницу заново,
+  Next.js подгружает только данные новой страницы и подменяет содержимое.
+  Поэтому это **SPA**.
+- Next.js заранее подгружает страницы, ссылки на которые видны на экране (prefetch),
+  так что переходы почти мгновенные.
+- `usePathname()` возвращает текущий адрес, по нему подсвечивается активный пункт меню.
+  `aria-current="page"` сообщает скринридеру, на какой странице находится пользователь.
+
+**Отличие от Vue Router:** во Vue я описывал маршруты массивом в `router/index.js`,
+а здесь маршрут — это файл. Роль `<router-link>` играет `<Link>`, а роль `<router-view>` — `children` в `layout.tsx`.
 
 ---
 
-## 4. Демонстрация (что показать вживую)
+## 5. Сервер и браузер
 
-1. `npm install`, затем `npm run dev`, открыть http://localhost:5173.
-2. Пощёлкать меню: адрес в строке меняется, а страница **не перезагружается**
-   (в DevTools → Network новых загрузок HTML нет). Кнопка «Назад» работает.
-3. Перейти в «Контакты», отправить 2 сообщения: появится список и счётчик.
-4. Уйти на «Главную» и вернуться в «Контакты»: сообщения **на месте**,
-   потому что они хранятся в Pinia, а не в самой странице.
-5. Удалить одно сообщение (✕), затем очистить все.
-6. Сузить окно: сетки перестраиваются в одну колонку, меню переносится.
+Все `page.tsx` и `layout.tsx` — **серверные компоненты**: они выполняются на сервере
+(или при сборке), и в браузер приходит готовый HTML. Их JavaScript в браузер не загружается.
+
+`"use client"` стоит только там, где нужна интерактивность:
+
+| Компонент | Зачем ему браузер |
+|---|---|
+| `NavLink` | `usePathname()` для подсветки активной ссылки |
+| `QueryProvider` | создаёт кеш TanStack Query (нужен `useState`) |
+| `ContactScreen` | форма, обработчики событий, запросы к API |
+
+**Пример границы** (`app/contact/page.tsx`):
+
+```tsx
+<PageShell title="Контакты">
+  <ContactScreen info={<ContactInfo />} />
+</PageShell>
+```
+
+`ContactInfo` — статичный блок, он рендерится на сервере и передаётся внутрь клиентского
+`ContactScreen` через prop. Так клиентским становится только то, что действительно интерактивно.
+
+**Главная получает данные на сервере:**
+
+```tsx
+export default function HomePage() {
+  return <HomeScreen overview={getMonitoringOverview()} />
+}
+```
+
+Страница вызывает use-case прямо на сервере и передаёт экрану готовые данные через props.
+В сборке эти страницы помечены как `○ (Static)`: они собраны заранее и открываются мгновенно.
 
 ---
 
-## 5. Вопросы, которые могут задать, и ответы
+## 6. Данные мониторинга: domain → use-case → компоненты
 
-**Что такое SPA и чем отличается от обычного сайта?**
-Обычный сайт при каждом переходе загружает новую HTML-страницу с сервера.
-SPA загружается один раз, а дальше JavaScript сам меняет содержимое
-и адрес. Переходы быстрее, и состояние (например, данные в Pinia)
-сохраняется между страницами.
+### domain — правила предметной области (`monitoring.ts`)
 
-**Как роутер меняет адрес без перезагрузки?**
-Через History API браузера (`history.pushState`). `<router-link>` отменяет
-обычный переход по ссылке, роутер находит маршрут в таблице и подставляет
-нужный компонент в `<router-view>`.
+```ts
+export function percentOf(part: number, total: number): number {
+  if (total <= 0) return 0
+  return Math.round((part / total) * 100)
+}
 
-**Зачем нужен стейт-менеджер, если можно хранить данные в компоненте?**
-Данные внутри компонента живут, пока он на экране: при переходе на другую
-страницу компонент уничтожается, и данные пропадают. Хранилище Pinia живёт,
-пока открыто приложение, и одно на всех. В моём проекте главная читает из него
-метрики, а «Контакты» пишут и удаляют сообщения.
+export function completenessGain(progress: CompletenessProgress): number {
+  return roundTo(progress.current - progress.before)   // 63.9 − 61.7 = 2.2
+}
 
-**Что такое state, getters и actions?**
-State — сами данные (`ref`). Getters — значения, вычисляемые из данных
-(`computed`, у меня `messageCount`). Actions — функции, которые меняют
-данные (`addMessage`, `removeMessage`, `clearMessages`).
+export function detectionQuality(rate: number): DetectionQuality {
+  return rate >= GOOD_DETECTION_THRESHOLD ? 'good' : 'needs-work'
+}
+```
 
-**Почему Pinia, а не Vuex?**
-Pinia — официальный рекомендуемый стейт-менеджер для Vue 3. В нём
-нет мутаций, как во Vuex, меньше шаблонного кода, и он поддерживает
-Composition API.
+- Чистые функции без React и HTTP, поэтому их легко проверить и переиспользовать.
+- `roundTo` нужен из-за особенностей дробных чисел: `63.9 - 61.7` в JavaScript даёт
+  `2.2000000000000028`.
+- `detectionQuality` решает, какая подпись будет у карточки: «Хорошо обнаруживается»
+  (78.3%) или «Требует доработки» (48.1%). Порог 70% вынесен в константу.
 
-**Что будет, если сделать `const { wells } = store`?**
-Реактивность потеряется: `wells` станет обычным числом и перестанет
-обновляться. Для деструктуризации нужен `storeToRefs(store)`. Поэтому
-я обращаюсь к данным через `store.wells`.
+### use-case — сборка показателей (`get-monitoring-overview.ts`)
 
-**Зачем `:key` в `v-for`?**
-Чтобы Vue отличал элементы списка друг от друга и при изменениях
-(например, удалении сообщения) перерисовывал только нужный элемент.
+```ts
+export function getMonitoringOverview(): MonitoringOverview {
+  const snapshot = loadMonitoringSnapshot()
+  const downtime = totalDowntime(snapshot.faultGroups)
+  return {
+    ...snapshot,
+    deviationShare: percentOf(snapshot.wellsWithDeviations, snapshot.totalWells), // 63%
+    totalDowntime: downtime,                                                       // 843
+    faultSummaries: snapshot.faultGroups.map((group) => ({
+      ...group,
+      share: percentOf(group.downtimeCount, downtime),                             // 47% / 53%
+      quality: detectionQuality(group.detectionRate),
+    })),
+    ...
+  }
+}
+```
 
-**Чем `v-if` отличается от `v-show`?**
-`v-if` добавляет или удаляет элемент из DOM, а `v-show` только скрывает
-его через `display: none`. Для списка сообщений, который появляется
-редко, подходит `v-if`.
+Берёт исходные данные из инфраструктуры и рассчитывает всё, что показывают страницы.
+**Ни одно производное число не вписано в вёрстку вручную**: 63%, 843, 47%/53%, +2.2%,
+разброс 54–69% считаются из исходных данных.
 
-**Что делает `.prevent` в `@submit.prevent`?**
-Вызывает `preventDefault()`: браузер не отправляет форму на сервер
-и не перезагружает страницу.
+### Компоненты — только отображение
 
-**Сохранятся ли сообщения после обновления страницы (F5)?**
-Нет. Pinia хранит данные в памяти вкладки, и при перезагрузке они
-сбрасываются. Чтобы сохранять их, можно записывать массив в `localStorage`
-(или подключить плагин `pinia-plugin-persistedstate`), а в реальном проекте
-отправлять на сервер через API.
+```tsx
+{summaries.map((group) => (
+  <div key={group.id}>
+    <span className={groupColors[group.id].text}>{group.title}</span>
+    <ProgressBar value={group.share} label={group.title} barClassName={groupColors[group.id].bar} />
+    <span>{group.downtimeCount} ({group.share}%)</span>
+  </div>
+))}
+```
 
-**Что будет, если открыть несуществующий адрес, например `/abc`?**
-Сейчас откроется пустая область между меню и подвалом. Это исправляется
-маршрутом-«заглушкой» `{ path: '/:pathMatch(.*)*', component: NotFound }`.
+- `.map()` выводит список, а `key` помогает React понять, какой элемент изменился.
+- Цвета хранятся в объекте по `id` группы (`Record<FaultGroupId, ...>`). Если добавить
+  новую группу и забыть указать для неё цвет, TypeScript выдаст ошибку.
+- Классы Tailwind записаны целиком (`'text-blue-600'`), а не собираются из частей:
+  Tailwind находит классы поиском по тексту файлов.
+
+---
+
+## 7. Форма контактов: полный путь через все слои
+
+Это главный пример архитектуры и стейт-менеджмента.
+
+```
+ContactForm (кнопка «Отправить»)
+  → useContactFlow.submit()                       flows
+    → useSendMessageMutation().mutate(form)       interactions
+      → sendContactMessage(form)                  use-case: проверка Zod в браузере
+        → createMessage(data)                     infrastructure: POST /api/messages
+          → route.ts POST                         app/api: сервер
+            → acceptContactMessage(body)          use-case: повторная проверка на сервере
+              → messageRepository.add(...)        infrastructure: сохранение
+      ← onSuccess: setQueryData(...)              кеш обновлён, список перерисован
+```
+
+### domain — схема формы (`message.ts`)
+
+```ts
+export const contactFormSchema = z.object({
+  name: z.string().trim().min(2, 'Имя должно быть не короче 2 символов').max(80, ...),
+  email: z.string().trim().pipe(z.email('Введите корректный email')),
+  text: z.string().trim().min(1, 'Введите сообщение').max(2000, ...),
+})
+export type ContactForm = z.output<typeof contactFormSchema>
+```
+
+- **Zod** описывает правила один раз. Из той же схемы TypeScript выводит тип
+  (`z.output`), поэтому тип и проверка не могут разойтись.
+- `.trim()` убирает пробелы, так что имя из одних пробелов не пройдёт.
+- `validateContactForm` возвращает либо очищенные данные, либо ошибки по каждому полю.
+
+### Проверка в двух местах
+
+- **В браузере** (`send-contact-message.ts`): пользователь сразу видит ошибки, лишний
+  запрос не отправляется.
+- **На сервере** (`accept-contact-message.ts`): клиенту доверять нельзя, запрос можно
+  отправить в обход формы. Сервер проверяет данные по **той же схеме** и отвечает `400`
+  с ошибками по полям.
+
+### infrastructure — HTTP-клиент (`http-client.ts`)
+
+```ts
+export async function requestJson<T>(path: string, schema: z.ZodType<T>, init?: RequestInit): Promise<T> {
+  const response = await send(path, init)
+  const parsed = schema.safeParse(await response.json().catch(() => null))
+  if (!parsed.success) throw new ApiError('Сервер вернул данные в неожиданном формате', response.status)
+  return parsed.data
+}
+```
+
+- Вся работа с `fetch` собрана в одном месте: базовый URL, заголовки, `credentials`,
+  обработка ошибок. Компоненты сами `fetch` не вызывают.
+- **Ответ сервера тоже проверяется схемой.** Данные из сети считаются неизвестными,
+  и в приложение попадают только данные правильного формата.
+- Ошибка сети или сервера превращается в `ApiError` с понятным текстом на русском.
+
+### interactions — TanStack Query (`messages.ts`)
+
+```ts
+export const messageKeys = { list: ['messages', 'list'] as const }
+
+export function useMessagesQuery() {
+  return useQuery({ queryKey: messageKeys.list, queryFn: fetchMessages })
+}
+
+export function useSendMessageMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: sendContactMessage,
+    onSuccess: (message) => {
+      queryClient.setQueryData<Message[]>(messageKeys.list, (current = []) => [...current, message])
+    },
+  })
+}
+```
+
+- **`useQuery`** загружает данные и хранит их в кеше по ключу `['messages', 'list']`.
+  Сам отслеживает состояния: `isPending` (загрузка), `error`, `data`.
+- **`useMutation`** — изменение данных на сервере (создать, удалить).
+- **Точечное обновление кеша:** после отправки новое сообщение добавляется в кеш через
+  `setQueryData`, а не перезагружается весь список. После удаления оно убирается из кеша фильтром.
+- `QueryClient` создаётся в `QueryProvider` через `useState(() => new QueryClient())`:
+  один раз на вкладку, без пересоздания при каждой перерисовке.
+
+### flows — сценарий экрана (`use-contact-flow.ts`)
+
+```ts
+export function useContactFlow() {
+  const [form, setForm] = useState<ContactFormInput>(EMPTY_FORM)
+  const messagesQuery = useMessagesQuery()
+  const sendMutation = useSendMessageMutation()
+  ...
+  function submit() {
+    sendMutation.mutate(form, { onSuccess: () => setForm(EMPTY_FORM) })
+  }
+  return { form, updateField, submit, fieldErrors, isSending, messages, removeMessage, ... }
+}
+```
+
+Собирает для экрана всё сразу: поля формы, запрос списка, три мутации, ошибки и флаги
+загрузки. Компоненты получают готовый объект `flow` и ничего не знают о Query и API.
+Когда пользователь начинает исправлять поле, старые ошибки сбрасываются (`sendMutation.reset()`).
+
+### components — только отображение
+
+- `ContactForm`: поля описаны массивом и выводятся через `.map()`. `<label htmlFor>`
+  связан с полем, `aria-invalid` и `aria-describedby` сообщают скринридеру об ошибке.
+  `noValidate` отключает встроенную проверку браузера, чтобы тексты ошибок были из нашей схемы.
+- `MessageList` показывает все состояния: **загрузка**, **ошибка с кнопкой «Повторить»**,
+  **пустой список** и **сообщения**. Пока сообщение удаляется, его кнопка заблокирована.
+
+### Сервер — Route Handlers
+
+```ts
+// app/api/messages/route.ts
+export async function POST(request: Request) {
+  const body: unknown = await request.json().catch(() => null)
+  const result = acceptContactMessage(body)
+  if (!result.ok) {
+    return Response.json({ error: 'Форма заполнена с ошибками', fieldErrors: result.fieldErrors }, { status: 400 })
+  }
+  return Response.json(result.message, { status: 201 })
+}
+```
+
+- Route Handler — серверная функция на стандартных `Request` и `Response`.
+- Коды ответов: `201` — создано, `400` — ошибка данных, `404` — не найдено, `204` — удалено, без тела.
+- `GET`, `DELETE` и `DELETE /[id]` обращаются к хранилищу напрямую: отдельный use-case
+  был бы просто переименованием одного вызова, а скилл это запрещает.
+
+---
+
+## 8. Где какое состояние
+
+| Состояние | Где хранится | Почему |
+|---|---|---|
+| Метрики мониторинга | на сервере, передаются через props | не меняются, им не нужен JavaScript в браузере |
+| Сообщения | API + кеш TanStack Query | это данные сервера: нужны загрузка, ошибки, кеш и синхронизация |
+| Текст в полях формы | локальный `useState` во flow | временное состояние интерфейса |
+| Текущая страница | URL | переживает обновление, ссылкой можно поделиться |
+
+---
+
+## 9. Демонстрация (что показать вживую)
+
+1. `npm install`, затем `npm run dev`, открыть http://localhost:3000.
+2. Пощёлкать меню: адрес меняется, страница не перезагружается, активный пункт
+   подчёркнут, у вкладки меняется заголовок.
+3. «Контакты» → нажать «Отправить» на пустой форме: под полями появятся ошибки из схемы Zod.
+4. Заполнить форму и отправить: появится «Сообщение отправлено», форма очистится,
+   сообщение появится в списке со счётчиком.
+5. **Нажать F5: сообщение осталось**, потому что оно хранится на сервере.
+6. Удалить сообщение (✕), затем очистить все.
+7. Открыть `/abc`: появится страница 404.
+8. В DevTools → Network видно запросы к `/api/messages` и коды ответов.
+9. Сузить окно: сетки перестраиваются, меню переносится.
+
+---
+
+## 10. Вопросы, которые могут задать, и ответы
+
+**Что такое SPA, если Next.js рендерит страницы на сервере?**
+Первая страница приходит готовым HTML, поэтому она быстро открывается и индексируется
+поисковиками. Дальше приложение работает как SPA: `<Link>` переключает страницы без
+перезагрузки, шапка и подвал остаются на месте, и состояние (кеш TanStack Query) сохраняется.
+
+**Где здесь стейт-менеджер?**
+TanStack Query — менеджер **серверного состояния**. Он хранит данные с сервера в общем
+кеше, следит за загрузкой и ошибками, обновляет кеш после мутаций. Любой компонент,
+вызвавший `useMessagesQuery()`, получит те же данные из кеша без повторного запроса.
+
+**Почему не Redux или Zustand?**
+По архитектуре проекта состояние разделено по назначению: данные сервера хранятся в
+TanStack Query, временное состояние интерфейса — в `useState`, параметры — в URL.
+Глобального клиентского состояния, которое не относится ни к одному из этих типов, в
+проекте нет. Отдельный Redux дублировал бы то, что уже делает Query.
+
+**Чем серверный компонент отличается от клиентского?**
+Серверный выполняется на сервере, и его код в браузер не попадает. В нём нельзя
+использовать `useState`, обработчики событий и браузерные API. Клиентский (с
+`"use client"`) загружается в браузер и может быть интерактивным. Я помечаю клиентскими
+только интерактивные части.
+
+**Зачем проверять форму и в браузере, и на сервере?**
+Проверка в браузере нужна для удобства: ошибки видны сразу. Проверка на сервере — для
+безопасности: запрос можно отправить в обход формы, например через DevTools или curl.
+Обе используют одну схему из `domain`.
+
+**Зачем проверять ответ сервера схемой?**
+Ответ внешнего API — это неизвестные данные. Если формат изменится, ошибка будет понятной
+и случится в одном месте (`http-client.ts`), а не где-то в глубине компонента.
+
+**Зачем `queryKey`?**
+Это адрес данных в кеше. По нему мутации находят нужный список и обновляют его, а
+разные компоненты получают одни и те же данные.
+
+**Почему `setQueryData`, а не `invalidateQueries`?**
+`invalidateQueries` перезапросил бы весь список с сервера. Сервер и так вернул созданное
+сообщение, поэтому достаточно точечно добавить его в кеш, и лишнего запроса не будет.
+
+**Сохранятся ли сообщения после перезапуска сервера?**
+Нет. Они хранятся в памяти сервера (`message-repository.ts`), поэтому переживают F5,
+но не перезапуск. В реальном проекте там была бы база данных, и поменялся бы только этот файл.
+
+**Зачем TypeScript?**
+Ошибки находятся до запуска. Например, если опечататься в имени поля формы или забыть
+цвет для новой группы неисправностей, проект не соберётся.
+
+**Как проверить качество кода?**
+`npm run lint` (ESLint с правилами Next.js и React Hooks) и `npm run build` (сборка с
+проверкой типов). Оба проходят без ошибок и предупреждений.
 
 **Как опубликовать сайт?**
-`npm run build` создаёт папку `dist/`, её можно выложить на GitHub Pages,
-Netlify или Vercel. При режиме `createWebHistory` хостинг нужно настроить
-так, чтобы на любой адрес он отдавал `index.html`. Иначе при обновлении
-страницы `/about` сервер вернёт 404. Другой вариант — перейти на
-`createWebHashHistory`.
-
-**Откуда данные?**
-Метрики взяты из презентации результатов проекта: 2 494 скважины,
-1 570 с отклонениями, 843 простоя (398 наземный привод + 445 ГНО),
-полнота обнаружения выросла с 61.7% до 63.9% при цели ≥ 90%.
+Проще всего на Vercel: подключить репозиторий, и сайт соберётся сам. GitHub Pages не
+подойдёт, потому что он отдаёт только статические файлы, а здесь есть серверный API.
 
 ---
 
-## 6. Итог
+## 11. Итог
 
-- **Лендинг:** главная страница с hero-блоком, метриками, диаграммами и
-  призывом к действию; адаптивная вёрстка на Tailwind.
-- **SPA и роутинг:** Vue Router, 4 маршрута, `<router-link>` и `<router-view>`,
-  History API.
-- **Стейт-менеджер:** Pinia (state, getters, actions); данные общие для
-  нескольких страниц, чтение на главной, запись и удаление на «Контактах».
-- **Git:** код опубликован на GitHub.
+- **Лендинг:** главная с hero-блоком, метриками, диаграммами и призывом к действию;
+  адаптивная вёрстка на Tailwind.
+- **SPA и роутинг:** Next.js App Router, 4 страницы + 404, `<Link>` и общий `layout`.
+- **Стейт-менеджер:** TanStack Query — кеш, загрузка, ошибки, мутации с точечным
+  обновлением кеша.
+- **Архитектура:** слои `app → components → flows → interactions → use-cases →
+  infrastructure`, предметная логика в `domain` не зависит от UI.
+- **Надёжность:** TypeScript, проверка Zod на клиенте, на сервере и для ответов API,
+  все состояния экрана (загрузка, ошибка, пусто).
+- **Git:** Vue-версия в `main`, React-версия в `react-nextjs`.
