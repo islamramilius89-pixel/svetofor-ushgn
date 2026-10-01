@@ -1,6 +1,6 @@
-# Защита проекта «Светофор УШГН» (React-версия)
+# Защита проекта «Светофор УШГН»
 
-Репозиторий: https://github.com/islamramilius89-pixel/svetofor-ushgn (ветка `react-nextjs`)
+Репозиторий: https://github.com/islamramilius89-pixel/svetofor-ushgn
 
 ## 1. Коротко о проекте (вступление, ~1 минута)
 
@@ -20,8 +20,7 @@
 
 **Стек:** Next.js 16 (App Router), React 19, TypeScript, TanStack Query, Zod, Tailwind CSS 4.
 
-Сначала проект был на Vue 3 (ветка `main`), затем я переписал его на React по слоистой
-архитектуре, описанной в скилле `.claude/skills/next-frontend-architecture/SKILL.md`.
+Проект построен по слоистой архитектуре, описанной в скилле `.claude/skills/next-frontend-architecture/SKILL.md`.
 
 ---
 
@@ -152,9 +151,6 @@ export function NavLink({ href, children }) {
   так что переходы почти мгновенные.
 - `usePathname()` возвращает текущий адрес, по нему подсвечивается активный пункт меню.
   `aria-current="page"` сообщает скринридеру, на какой странице находится пользователь.
-
-**Отличие от Vue Router:** во Vue я описывал маршруты массивом в `router/index.js`,
-а здесь маршрут — это файл. Роль `<router-link>` играет `<Link>`, а роль `<router-view>` — `children` в `layout.tsx`.
 
 ---
 
@@ -494,4 +490,4 @@ TanStack Query, временное состояние интерфейса — �
   infrastructure`, предметная логика в `domain` не зависит от UI.
 - **Надёжность:** TypeScript, проверка Zod на клиенте, на сервере и для ответов API,
   все состояния экрана (загрузка, ошибка, пусто).
-- **Git:** Vue-версия в `main`, React-версия в `react-nextjs`.
+- **Git:** код опубликован на GitHub.
