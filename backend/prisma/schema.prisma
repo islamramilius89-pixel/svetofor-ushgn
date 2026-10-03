@@ -1,0 +1,97 @@
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+/// Светофор: зелёный — норма, жёлтый — отклонение, красный — нужна срочная проверка.
+enum WellStatus {
+  GREEN
+  YELLOW
+  RED
+}
+
+enum TicketStatus {
+  NEW
+  IN_PROGRESS
+  DONE
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model Ngdu {
+  id    Int    @id @default(autoincrement())
+  name  String @unique
+  wells Well[]
+}
+
+model Well {
+  id          Int        @id @default(autoincrement())
+  number      String     @unique
+  ngduId      Int
+  ngdu        Ngdu       @relation(fields: [ngduId], references: [id])
+  /// Отклонение тока двигателя от эталона, %. По нему рассчитывается статус.
+  deviation   Float
+  status      WellStatus
+  note        String     @default("")
+  lastCheckAt DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  tickets     Ticket[]
+
+  @@index([ngduId])
+  @@index([status])
+}
+
+model Ticket {
+  id          Int            @id @default(autoincrement())
+  title       String
+  description String         @default("")
+  status      TicketStatus   @default(NEW)
+  priority    TicketPriority @default(MEDIUM)
+  assignee    String         @default("")
+  wellId      Int
+  well        Well           @relation(fields: [wellId], references: [id], onDelete: Cascade)
+  comments    Comment[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  resolvedAt  DateTime?
+
+  @@index([wellId])
+  @@index([status])
+}
+
+model Comment {
+  id        Int      @id @default(autoincrement())
+  ticketId  Int
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author    String
+  text      String
+  createdAt DateTime @default(now())
+
+  @@index([ticketId])
+}
+
+model Message {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String
+  text      String
+  createdAt DateTime @default(now())
+}
+
+model Admin {
+  id           Int      @id @default(autoincrement())
+  login        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+}

@@ -2,6 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState, type ReactNode } from 'react'
+import { StoreHydrator } from './StoreHydrator'
 
 export function QueryProvider({ children }: { children: ReactNode }) {
   // Клиент создаётся один раз на вкладку и не делится между пользователями на сервере.
@@ -14,5 +15,10 @@ export function QueryProvider({ children }: { children: ReactNode }) {
       }),
   )
 
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  return (
+    <QueryClientProvider client={queryClient}>
+      <StoreHydrator />
+      {children}
+    </QueryClientProvider>
+  )
 }

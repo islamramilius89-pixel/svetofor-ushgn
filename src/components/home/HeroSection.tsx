@@ -14,16 +14,16 @@ export function HeroSection() {
           </p>
           <div className="flex gap-4 justify-center flex-wrap">
             <Link
-              href="/about"
+              href="/wells"
               className="bg-white text-blue-600 px-8 py-4 rounded-lg font-bold hover:bg-blue-50 transition text-lg"
             >
-              Узнать больше
+              Открыть скважины
             </Link>
             <Link
-              href="/contact"
+              href="/board"
               className="border-2 border-white px-8 py-4 rounded-lg font-bold hover:bg-white hover:text-blue-600 transition text-lg"
             >
-              Контакты
+              Доска заявок
             </Link>
           </div>
         </div>

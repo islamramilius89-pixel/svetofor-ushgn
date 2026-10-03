@@ -3,8 +3,10 @@ import { NavLink } from './NavLink'
 
 const navItems = [
   { href: '/', label: 'Главная' },
-  { href: '/about', label: 'О проекте' },
+  { href: '/wells', label: 'Скважины' },
+  { href: '/board', label: 'Заявки' },
   { href: '/results', label: 'Результаты' },
+  { href: '/about', label: 'О проекте' },
   { href: '/contact', label: 'Контакты' },
 ]
 
@@ -15,7 +17,7 @@ export function SiteHeader() {
         <Link href="/" className="text-2xl font-bold flex items-center gap-2 hover:scale-105 transition">
           🚨 Светофор УШГН
         </Link>
-        <ul className="flex flex-wrap gap-4 md:gap-8 items-center">
+        <ul className="flex flex-wrap gap-x-4 gap-y-2 md:gap-x-6 items-center">
           {navItems.map((item) => (
             <li key={item.href}>
               <NavLink href={item.href}>{item.label}</NavLink>

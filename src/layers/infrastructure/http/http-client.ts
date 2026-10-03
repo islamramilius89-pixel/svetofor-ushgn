@@ -18,6 +18,35 @@ export class ApiError extends Error {
   }
 }
 
+/** Превращает ответ с ошибкой в ApiError с понятным текстом. Используется и в браузере, и на сервере. */
+export async function toApiError(response: Response): Promise<ApiError> {
+  const body = errorBodySchema.safeParse(await response.json().catch(() => null))
+  return new ApiError(
+    body.success ? body.data.error : `Ошибка сервера (${response.status})`,
+    response.status,
+    body.success ? body.data.fieldErrors : undefined,
+  )
+}
+
+/** Проверяет JSON-ответ схемой: в приложение попадают только данные ожидаемого формата. */
+export async function parseJson<T>(response: Response, schema: z.ZodType<T>): Promise<T> {
+  const parsed = schema.safeParse(await response.json().catch(() => null))
+  if (!parsed.success) {
+    throw new ApiError('Сервер вернул данные в неожиданном формате', response.status)
+  }
+  return parsed.data
+}
+
+/** Собирает строку запроса, пропуская пустые значения. */
+export function toQueryString(params: Record<string, string | number | undefined | null>): string {
+  const search = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== '') search.set(key, String(value))
+  }
+  const query = search.toString()
+  return query ? `?${query}` : ''
+}
+
 async function send(path: string, init?: RequestInit): Promise<Response> {
   let response: Response
   try {
@@ -33,29 +62,20 @@ async function send(path: string, init?: RequestInit): Promise<Response> {
     throw new ApiError('Нет связи с сервером. Проверьте подключение.', 0)
   }
 
-  if (!response.ok) {
-    const body = errorBodySchema.safeParse(await response.json().catch(() => null))
-    throw new ApiError(
-      body.success ? body.data.error : `Ошибка сервера (${response.status})`,
-      response.status,
-      body.success ? body.data.fieldErrors : undefined,
-    )
-  }
-
+  if (!response.ok) throw await toApiError(response)
   return response
 }
 
-/** Запрос с JSON-ответом. Ответ сервера проверяется схемой: в приложение попадают только данные ожидаемого формата. */
 export async function requestJson<T>(path: string, schema: z.ZodType<T>, init?: RequestInit): Promise<T> {
-  const response = await send(path, init)
-  const parsed = schema.safeParse(await response.json().catch(() => null))
-  if (!parsed.success) {
-    throw new ApiError('Сервер вернул данные в неожиданном формате', response.status)
-  }
-  return parsed.data
+  return parseJson(await send(path, init), schema)
 }
 
 /** Запрос без тела ответа (например, удаление). */
 export async function requestVoid(path: string, init?: RequestInit): Promise<void> {
   await send(path, init)
 }
+
+export const jsonBody = (method: 'POST' | 'PATCH', body: unknown): RequestInit => ({
+  method,
+  body: JSON.stringify(body),
+})

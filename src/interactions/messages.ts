@@ -11,22 +11,13 @@ export const messageKeys = {
   list: ['messages', 'list'] as const,
 }
 
-export function useMessagesQuery() {
-  return useQuery({
-    queryKey: messageKeys.list,
-    queryFn: fetchMessages,
-  })
+export function useSendMessageMutation() {
+  return useMutation({ mutationFn: sendContactMessage })
 }
 
-export function useSendMessageMutation() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: sendContactMessage,
-    // Добавляем ответ сервера в кеш вместо повторной загрузки всего списка.
-    onSuccess: (message) => {
-      queryClient.setQueryData<Message[]>(messageKeys.list, (current = []) => [...current, message])
-    },
-  })
+/** Только для админки. */
+export function useMessagesQuery() {
+  return useQuery({ queryKey: messageKeys.list, queryFn: fetchMessages })
 }
 
 export function useDeleteMessageMutation() {
